@@ -50,6 +50,9 @@
 
 #define SP_READ_LEVEL_INTERVAL_COUNT 3600
 
+int backlight_min = 0;
+module_param(backlight_min, int, 0644);
+
 static char dsi_display_primary[MAX_CMDLINE_PARAM_LEN];
 static char dsi_display_secondary[MAX_CMDLINE_PARAM_LEN];
 static char SERIAL_NUMBER_flag = 0;
@@ -841,6 +844,9 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 
 	bl_scale_sv = panel->bl_config.bl_scale_sv;
 	bl_temp = (u32)bl_temp * bl_scale_sv / MAX_SV_BL_SCALE_LEVEL;
+
+	if (bl_temp != 0 && bl_temp < backlight_min)
+		bl_temp = backlight_min;
 
 	DSI_DEBUG("bl_scale = %u, bl_scale_sv = %u, bl_lvl = %u\n",
 		bl_scale, bl_scale_sv, (u32)bl_temp);
