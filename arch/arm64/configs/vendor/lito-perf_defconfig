@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.19.81 Kernel Configuration
+# Linux/arm64 4.19.84 Kernel Configuration
 #
 
 #
@@ -4546,7 +4546,6 @@ CONFIG_RPMSG_QCOM_GLINK_SPSS=y
 # CONFIG_RPMSG_QCOM_SMD is not set
 # CONFIG_RPMSG_VIRTIO is not set
 # CONFIG_MSM_RPM_SMD is not set
-# CONFIG_SOUNDWIRE is not set
 
 #
 # SOC (System On Chip) specific Drivers
