@@ -135,3 +135,8 @@ all.config
 
 # fetched Android config fragments
 kernel/configs/android-*.cfg
+AnyKernel3/
+error.log
+out/
+scripts/ufdt/libufdt
+clang-llvm
