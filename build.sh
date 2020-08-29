@@ -37,7 +37,7 @@ err() {
 KERNEL_DIR=$PWD
 
 # Kernel Version
-VERSION="0.1"
+VERSION="0.2"
 
 # Sign Kernel or not
 SIGN=1
