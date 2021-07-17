@@ -735,10 +735,8 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 	struct ovl_dir_file *od = file->private_data;
 	struct dentry *dentry = file->f_path.dentry;
 	struct ovl_cache_entry *p;
-	const struct cred *old_cred;
 	int err;
 
-	old_cred = ovl_override_creds(dentry->d_sb);
 	if (!ctx->pos)
 		ovl_dir_reset(file);
 
@@ -752,20 +750,17 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 		    (ovl_same_sb(dentry->d_sb) &&
 		     (ovl_is_impure_dir(file) ||
 		      OVL_TYPE_MERGE(ovl_path_type(dentry->d_parent))))) {
-			err = ovl_iterate_real(file, ctx);
-		} else {
-			err = iterate_dir(od->realfile, ctx);
+			return ovl_iterate_real(file, ctx);
 		}
-		goto out;
+		return iterate_dir(od->realfile, ctx);
 	}
 
 	if (!od->cache) {
 		struct ovl_dir_cache *cache;
 
 		cache = ovl_cache_get(dentry);
-		err = PTR_ERR(cache);
 		if (IS_ERR(cache))
-			goto out;
+			return PTR_ERR(cache);
 
 		od->cache = cache;
 		ovl_seek_cursor(od, ctx->pos);
@@ -777,7 +772,7 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 			if (!p->ino) {
 				err = ovl_cache_update_ino(&file->f_path, p);
 				if (err)
-					goto out;
+					return err;
 			}
 			if (!dir_emit(ctx, p->name, p->len, p->ino, p->type))
 				break;
@@ -785,10 +780,7 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 		od->cursor = p->l_node.next;
 		ctx->pos++;
 	}
-	err = 0;
-out:
-	revert_creds(old_cred);
-	return err;
+	return 0;
 }
 
 static loff_t ovl_dir_llseek(struct file *file, loff_t offset, int origin)
@@ -834,14 +826,7 @@ out_unlock:
 static struct file *ovl_dir_open_realfile(struct file *file,
 					  struct path *realpath)
 {
-	struct file *res;
-	const struct cred *old_cred;
-
-	old_cred = ovl_override_creds(file_inode(file)->i_sb);
-	res = ovl_path_open(realpath, O_RDONLY | (file->f_flags & O_LARGEFILE));
-	revert_creds(old_cred);
-
-	return res;
+	return ovl_path_open(realpath, O_RDONLY | (file->f_flags & O_LARGEFILE));
 }
 
 static int ovl_dir_fsync(struct file *file, loff_t start, loff_t end,
