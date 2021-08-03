@@ -8728,6 +8728,12 @@ static void set_usb_switch(struct smb_charger *chg, bool enable)
 		pr_err("no fast_charger register found\n");
 		return;
 	}
+
+        if (chg->pd_active) {
+		pr_info("%s:pd_active return\n", __func__);
+		return;
+	}
+
 	if (enable) {
 		pr_err("switch on fastchg\n");
 		chg->switch_on_fastchg = true;
