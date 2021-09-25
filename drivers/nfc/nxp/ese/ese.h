@@ -31,8 +31,6 @@ struct ese_dev {
     struct mutex        write_mutex; /* write mutex */
     struct miscdevice   device;
     const char          *nfcc_name;
-    size_t kbuflen;
-    u8 *kbuf;
 };
 
 #endif //_NXP_ESE_H_

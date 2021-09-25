@@ -14,10 +14,10 @@
  */
 /******************************************************************************
  *
- *  The original Work has been changed by NXP Semiconductors.
+ *  The original Work has been changed by NXP.
  *
- *  Copyright (C) 2013-2019 NXP Semiconductors
- *   *
+ *  Copyright 2013-2020 NXP
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -71,12 +71,11 @@ struct pn8xt_dev {
     struct nfc_dev          *nfc_dev;
     struct work_struct      wq_task;
 };
-static struct pn8xt_dev *pn8xt_dev;
+
 static pn8xt_access_st_t *pn8xt_get_state(struct pn8xt_dev *pn8xt_dev)
 {
     return &pn8xt_dev->cur_state;
 }
-
 static void pn8xt_update_state(struct pn8xt_dev *pn8xt_dev, pn8xt_access_st_t state, bool set)
 {
     if (state) {
@@ -90,12 +89,6 @@ static void pn8xt_update_state(struct pn8xt_dev *pn8xt_dev, pn8xt_access_st_t st
                 pn8xt_dev->cur_state = ST_IDLE;
         }
     }
-}
-
-void pn8xt_update_state_out(struct nfc_dev *nfc_dev, pn8xt_access_st_t state, bool set)
-{
-    struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
-    pn8xt_update_state(pn8xt_dev, state, set);
 }
 
 int get_ese_lock(struct pn8xt_dev *pn8xt_dev, int timeout)
@@ -341,7 +334,9 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned lo
                         if(*cur_state & ST_SPI_FAILED) {
                             pn8xt_update_state(pn8xt_dev, ST_SPI_FAILED, false);
                         }
-                        pn8xt_update_state(pn8xt_dev, ST_SPI, false);
+                        if(*cur_state & ST_SPI) {
+                            pn8xt_update_state(pn8xt_dev, ST_SPI, false);
+                        }
                         if(isSignalTriggerReqd)
                             trigger_onoff(pn8xt_dev, ST_SPI_SVDD_SY_END);
                     }
@@ -369,7 +364,9 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned lo
                         if(*cur_state & ST_SPI_FAILED) {
                             pn8xt_update_state(pn8xt_dev, ST_SPI_FAILED, false);
                         }
-                        pn8xt_update_state(pn8xt_dev, ST_SPI, false);
+                        if(*cur_state & ST_SPI) {
+                            pn8xt_update_state(pn8xt_dev, ST_SPI, false);
+                        }
                         if(isSignalTriggerReqd)
                             trigger_onoff(pn8xt_dev, ST_SPI_SVDD_SY_END);
                         pr_debug("%s:PN80T legacy ese_pwr_gpio off", __func__);
@@ -512,7 +509,7 @@ static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned long a
         case JCP_DN_INIT:
             if(pn8xt_dev->service_pid) {
                 pr_err("%s:nfc service pid %ld", __func__, pn8xt_dev->service_pid);
-                signal_handler((pn8xt_access_st_t)JCP_DN_INIT, pn8xt_dev->service_pid);
+                signal_handler(JCP_DN_INIT, pn8xt_dev->service_pid);
             } else {
                 if (*cur_state & ST_JCP_DN) {
                     ret = -EINVAL;
@@ -529,7 +526,7 @@ static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned long a
             }
             break;
         case JCP_SPI_DN_COMP:
-            signal_handler((pn8xt_access_st_t)JCP_DWP_DN_COMP, pn8xt_dev->service_pid);
+            signal_handler(JCP_DWP_DN_COMP, pn8xt_dev->service_pid);
             pn8xt_update_state(pn8xt_dev, ST_JCP_DN, false);
             break;
         case JCP_DWP_DN_COMP:
@@ -597,10 +594,10 @@ static int set_wired_access(struct nfc_dev *nfc_dev, unsigned long arg)
     return 0;
 }
 
-//static void secure_timer_callback(unsigned long data)
+
 static void secure_timer_callback(struct timer_list *t)
 {
-    //struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)data;
+    struct pn8xt_dev *pn8xt_dev = from_timer(pn8xt_dev, t, secure_timer);;
     /* Flush and push the timer callback event to the bottom half(work queue)
     to be executed later, at a safer time */
     flush_workqueue(pn8xt_dev->pSecureTimerCbWq);
@@ -620,10 +617,7 @@ static long start_seccure_timer(struct pn8xt_dev *pn8xt_dev, unsigned long timer
     }
     /* Start the timer if timer value is non-zero */
     if(timer_value) {
-        //init_timer(&pn8xt_dev->secure_timer);
-        //setup_timer(&pn8xt_dev->secure_timer, secure_timer_callback, (unsigned long)pn8xt_dev);
         timer_setup(&pn8xt_dev->secure_timer, secure_timer_callback, 0);
-
         pr_debug("%s:timeout %lums (%lu)\n", __func__, timer_value, jiffies);
         ret = mod_timer(&pn8xt_dev->secure_timer, jiffies + msecs_to_jiffies(timer_value));
         if (ret)
@@ -718,13 +712,6 @@ long pn8xt_nfc_ese_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned lon
             ret = -EINVAL;
     };
     return ret;
-}
-
-bool pn8xt_nfc_ven_enabled(struct nfc_dev *nfc_dev)
-{
-	struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
-
-	return  pn8xt_dev->nfc_ven_enabled;
 }
 
 long pn8xt_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned long arg)

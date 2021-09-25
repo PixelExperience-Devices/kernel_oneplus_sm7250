@@ -32,7 +32,6 @@
 #include <linux/ioctl.h>
 #include <linux/miscdevice.h>
 #include <linux/i2c.h>
-#include <linux/oem/boot_mode.h>
 
 #include "../nfc/nfc.h"
 
@@ -52,20 +51,13 @@ static ssize_t ese_dev_read(struct file *filp, char __user *ubuf,
 {
     ssize_t ret = -EFAULT;
     struct ese_dev *ese_dev = filp->private_data;
-    // char rx_buf[MAX_BUFFER_SIZE];
-    unsigned char *rx_buf = NULL;
+    char rx_buf[MAX_BUFFER_SIZE];
     mutex_lock(&ese_dev->mutex);
     if (len > MAX_BUFFER_SIZE) {
         len = MAX_BUFFER_SIZE;
     }
-
-    rx_buf = ese_dev->kbuf;
-    if (!rx_buf) {
-        pr_info("%s: device doesn't exist anymore.\n", __func__);
-        ret = -ENODEV;
-        return ret;
-    }
-    memset(rx_buf, 0, len);
+    pr_debug("%s: start reading of %zu bytes\n", __func__, len);
+    memset(rx_buf, 0, sizeof(rx_buf));
     ret = spi_read(ese_dev->spi, rx_buf, len);
     if (0 > ret) {
         pr_err("%s failed to read from SPI\n", __func__);
@@ -78,6 +70,7 @@ static ssize_t ese_dev_read(struct file *filp, char __user *ubuf,
         return -EFAULT;
     }
     mutex_unlock(&ese_dev->mutex);
+    pr_debug("%s: Success in reading %zu bytes\n", __func__, len);
     return ret;
 }
 
@@ -86,35 +79,24 @@ static ssize_t ese_dev_write(struct file *filp, const char __user *ubuf,
 {
     ssize_t ret = -EFAULT;
     struct ese_dev *ese_dev = filp->private_data;
-    // char tx_buf[MAX_BUFFER_SIZE];
-    char *tx_buf = NULL;
-
+    char tx_buf[MAX_BUFFER_SIZE];
     mutex_lock(&ese_dev->write_mutex);
     if (len > MAX_BUFFER_SIZE)
         len = MAX_BUFFER_SIZE;
-
-#if 1
-    tx_buf = memdup_user(ubuf, len);
-    if (IS_ERR(tx_buf)) {
-        pr_info("%s: memdup_user failed\n", __func__);
-        ret = PTR_ERR(tx_buf);
-        return ret;
-    }
-#else
+    pr_debug("%s: start writing of %zu bytes\n", __func__, len);
     memset(tx_buf, 0, sizeof(tx_buf));
     if (copy_from_user(tx_buf, ubuf, len)) {
         pr_err("%s: failed to copy from user\n", __func__);
         mutex_unlock(&ese_dev->write_mutex);
         return -EFAULT;
     }
-#endif
     ret = spi_write(ese_dev->spi, tx_buf, len);
     if (ret < 0) {
         pr_err("%s: failed to write to SPI\n", __func__);
         mutex_unlock(&ese_dev->write_mutex);
         return -EIO;
     }
-    kfree(tx_buf);
+    pr_debug("%s: Success in writing %zu bytes\n", __func__, len);
     mutex_unlock(&ese_dev->write_mutex);
     return len;
 }
@@ -191,12 +173,6 @@ static int ese_probe(struct spi_device *spi)
     unsigned int max_speed_hz;
     struct ese_dev *ese_dev;
     struct device_node *np = dev_of_node(&spi->dev);
-
-    /*if (get_second_board_absent() == 1) {
-        pr_err("%s second board absent, don't probe p73",__func__);
-        return -EINVAL;
-    }*/
-
     pr_debug("%s: called\n", __func__);
     if (!np) {
         pr_err("%s: device tree data missing\n", __func__);
@@ -207,15 +183,6 @@ static int ese_probe(struct spi_device *spi)
         pr_err("%s: No memory\n", __func__);
         return -ENOMEM;
     }
-
-    ese_dev->kbuflen = MAX_BUFFER_SIZE;
-    ese_dev->kbuf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
-    if (!ese_dev->kbuf) {
-        pr_err("failed to allocate memory for ese_dev->kbuf");
-        ret = -ENOMEM;
-        goto err_free_dev;
-    }
-
     ese_dev->spi = spi;
     ese_dev->device.minor = MISC_DYNAMIC_MINOR;
     ese_dev->device.name = "p73";
@@ -279,8 +246,6 @@ static int ese_probe(struct spi_device *spi)
     mutex_init(&ese_dev->write_mutex);
     return 0;
 err:
-    kfree(ese_dev->kbuf);
-err_free_dev:
     kfree(ese_dev);
     return ret;
 }

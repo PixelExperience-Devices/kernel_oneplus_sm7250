@@ -46,31 +46,19 @@
 #include <linux/ioctl.h>
 #include <linux/miscdevice.h>
 #include <linux/i2c.h>
-#include <linux/oem/boot_mode.h>
+
 #include "nfc.h"
 #include "sn1xx.h"
 #include "pn8xt.h"
 
-#include <linux/oem/project_info.h>
-
 #define MAX_BUFFER_SIZE         (512)
-#define WAKEUP_SRC_TIMEOUT      (5000)
+#define WAKEUP_SRC_TIMEOUT      (2000)
 #define MAX_RETRY_COUNT          3
 #define MAX_SECURE_SESSIONS      1
-
-#define HWINFO     1
 
 /*Compile time function calls based on the platform selection*/
 #define platform_func(prefix, postfix) prefix##postfix
 #define func(prefix, postfix) platform_func(prefix, postfix)
-
-#if HWINFO
-struct hw_type_info hw_info;
-#endif
-
-#if HWINFO
-static void check_hw_info(struct nfc_dev *nfc_dev);
-#endif
 
 void nfc_disable_irq(struct nfc_dev *nfc_dev)
 {
@@ -98,9 +86,6 @@ static irqreturn_t nfc_dev_irq_handler(int irq, void *dev_id)
 {
     struct nfc_dev *nfc_dev = dev_id;
     unsigned long flags;
-if (device_may_wakeup(&nfc_dev->client->dev))
-	pm_wakeup_event(&nfc_dev->client->dev, WAKEUP_SRC_TIMEOUT);
-
     nfc_disable_irq(nfc_dev);
     spin_lock_irqsave(&nfc_dev->irq_enabled_lock, flags);
     nfc_dev->count_irq++;
@@ -113,17 +98,15 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
         size_t count, loff_t *offset)
 {
     struct nfc_dev *nfc_dev = filp->private_data;
-    // char tmp[MAX_BUFFER_SIZE];
-    unsigned char *tmp = NULL;
+    char tmp[MAX_BUFFER_SIZE];
     int ret;
     int irq_gpio_val = 0;
     if (!nfc_dev) {
         return -ENODEV;
     }
-
     if (count > MAX_BUFFER_SIZE)
         count = MAX_BUFFER_SIZE;
-
+    pr_debug("%s: start reading of %zu bytes\n", __func__, count);
     mutex_lock(&nfc_dev->read_mutex);
     irq_gpio_val = gpio_get_value(nfc_dev->irq_gpio);
     if (irq_gpio_val == 0) {
@@ -135,7 +118,10 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
         }
         while (1) {
             ret = 0;
-	nfc_enable_irq(nfc_dev);
+            if (!nfc_dev->irq_enabled) {
+                nfc_dev->irq_enabled = true;
+                enable_irq(nfc_dev->client->irq);
+            }
             if (!gpio_get_value(nfc_dev->irq_gpio)) {
                 ret = wait_event_interruptible(nfc_dev->read_wq,
                     !nfc_dev->irq_enabled);
@@ -147,12 +133,6 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
                 break;
             pr_warning("%s: spurious interrupt detected\n", __func__);
         }
-    }
-    tmp = nfc_dev->kbuf;
-    if (!tmp) {
-        pr_info("%s: device doesn't exist anymore\n", __func__);
-        ret = -ENODEV;
-        goto err;
     }
     memset(tmp, 0x00, count);
     /* Read data */
@@ -175,6 +155,7 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
         ret = -EFAULT;
         goto err;
     }
+    pr_debug("%s: Success in reading %zu bytes\n", __func__, count);
     return ret;
 err:
     mutex_unlock(&nfc_dev->read_mutex);
@@ -185,8 +166,7 @@ static ssize_t nfc_dev_write(struct file *filp, const char __user *buf,
         size_t count, loff_t *offset)
 {
     struct nfc_dev *nfc_dev = filp->private_data;
-    // char tmp[MAX_BUFFER_SIZE];
-    char *tmp = NULL;
+    char tmp[MAX_BUFFER_SIZE];
     int ret = 0;
     if (!nfc_dev) {
         return -ENODEV;
@@ -194,28 +174,19 @@ static ssize_t nfc_dev_write(struct file *filp, const char __user *buf,
     if (count > MAX_BUFFER_SIZE) {
         count = MAX_BUFFER_SIZE;
     }
-
-#if 1
-    tmp = memdup_user(buf, count);
-    if (IS_ERR(tmp)) {
-        pr_info("%s: memdup_user failed\n", __func__);
-        ret = PTR_ERR(tmp);
-        return ret;
-    }
-#else
+    pr_debug("%s: start writing of %zu bytes\n", __func__, count);
     if (copy_from_user(tmp, buf, count)) {
         pr_err("%s : failed to copy from user space\n", __func__);
         return -EFAULT;
     }
-#endif
     ret = i2c_master_send(nfc_dev->client, tmp, count);
     if (ret != count) {
         pr_err("%s: i2c_master_send returned %d\n", __func__, ret);
         ret = -EIO;
     }
+    pr_debug("%s: Success in writing %zu bytes\n", __func__, count);
     /* delay of 1ms for slow devices*/
     udelay(1000);
-    kfree(tmp);
     return ret;
 }
 
@@ -315,12 +286,6 @@ static int nfc_probe(struct i2c_client *client,
     struct nfc_dev *nfc_dev;
     pr_debug("%s: enter\n", __func__);
 
-    /*if (get_second_board_absent() == 1) {
-        pr_err("second board absent, don't probe pn5xx\n", __func__);
-	ret = -ENODEV;
-        goto err;
-    }*/
-
     ret = nfc_parse_dt(&client->dev, &platform_data);
     if (ret) {
         pr_err("%s : failed to parse\n", __func__);
@@ -413,14 +378,6 @@ static int nfc_probe(struct i2c_client *client,
         pr_info("%s: ese pwr gpio not provided\n", __func__);
     }
 
-    nfc_dev->kbuflen = MAX_BUFFER_SIZE;
-    nfc_dev->kbuf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
-    if (!nfc_dev->kbuf) {
-        pr_err("failed to allocate memory for pn544_dev->kbuf\n");
-        ret = -ENOMEM;
-        goto err_ese_pwr_gpio;
-    }
-
     nfc_dev->ven_gpio = platform_data.ven_gpio;
     nfc_dev->irq_gpio = platform_data.irq_gpio;
     nfc_dev->firm_gpio  = platform_data.firm_gpio;
@@ -450,7 +407,6 @@ static int nfc_probe(struct i2c_client *client,
     }
     device_init_wakeup(&client->dev, true);
     device_set_wakeup_capable(&client->dev, true);
-	enable_irq_wake(nfc_dev->client->irq);
     i2c_set_clientdata(client, nfc_dev);
     /*Enable IRQ and VEN*/
     nfc_enable_irq(nfc_dev);
@@ -461,14 +417,6 @@ static int nfc_probe(struct i2c_client *client,
         goto err_request_irq_failed;
     };
     pr_info("%s: probing NXP NFC exited successfully\n", __func__);
-    pr_info("%s: Name of nfcc: %s.\n", __func__, dev_name(&client->dev));
-
-#if HWINFO
-    /*
-     * This function is used only if
-     * hardware info is required during probe*/
-    check_hw_info(nfc_dev);
-#endif
     return 0;
 
 err_request_irq_failed:
@@ -476,7 +424,6 @@ err_request_irq_failed:
 err_misc_register:
     mutex_destroy(&nfc_dev->read_mutex);
     mutex_destroy(&nfc_dev->ese_status_mutex);
-    kfree(nfc_dev->kbuf);
 err_ese_pwr_gpio:
     gpio_free(platform_data.ese_pwr_gpio);
 err_firm_gpio:
@@ -517,36 +464,10 @@ static int nfc_remove(struct i2c_client *client)
     gpio_free(nfc_dev->firm_gpio);
     gpio_free(nfc_dev->irq_gpio);
     gpio_free(nfc_dev->ven_gpio);
-    kfree(nfc_dev->kbuf);
     kfree(nfc_dev);
 err:
     return ret;
 }
-
-static int nfc_suspend(struct device *device)
-{
-	struct i2c_client *client = to_i2c_client(device);
-	struct nfc_dev *nfc_dev;
-	bool ven_enabled = false;
-	int err = -1;
-	nfc_dev = i2c_get_clientdata(client);
-	ven_enabled = func(NFC_PLATFORM, _nfc_ven_enabled)(nfc_dev);
-	if (ven_enabled && gpio_get_value(nfc_dev->irq_gpio)) {
-		pm_wakeup_event(&nfc_dev->client->dev, WAKEUP_SRC_TIMEOUT);
-	return err;
-	}
-	nfc_enable_irq(nfc_dev);
-	return 0;
-}
-
-static int nfc_resume(struct device *device)
-{
-	return 0;
-}
-
-static const struct dev_pm_ops nfc_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(nfc_suspend, nfc_resume)
-};
 
 static const struct i2c_device_id nfc_id[] = {
         { "pn544", 0 },
@@ -567,149 +488,8 @@ static struct i2c_driver nfc_driver = {
                 .owner = THIS_MODULE,
                 .name  = "pn544",
                 .of_match_table = nfc_match_table,
-		.pm = &nfc_pm_ops,
-	},
+        },
 };
-
-#if HWINFO
-/******************************************************************************
- * Function         check_hw_info
- *
- * Description      This function is called during pn544_probe to retrieve
- *                  HW info.
- *                  Useful get HW information in case of previous FW download is
- *                  interrupted and core reset is not allowed.
- *                  This function checks if core reset  is allowed, if not
- *                  sets DWNLD_REQ(firm_gpio) , ven reset and sends firmware
- *                  get version command.
- *                  In response HW information will be received.
- *
- * Returns          None
- *
- ******************************************************************************/
-static void check_hw_info(struct nfc_dev *nfc_dev) {
-    //char read_data[20];
-    int ret, get_version_len = 8, retry_count = 0;
-    // static uint8_t cmd_reset_nci[] = {0x20, 0x00, 0x01, 0x00};
-    char get_version_cmd[] =
-    {0x00, 0x04, 0xF1, 0x00, 0x00, 0x00, 0x6E, 0xEF};
-
-    char *tmp = kzalloc(MAX_BUFFER_SIZE,GFP_KERNEL);
-    if (tmp == NULL) {
-        pr_err("%s: failed to allocate memory for transfer data\n", __func__);
-        return;
-    }
-
-    memcpy(tmp, get_version_cmd, get_version_len);
-
-
-    pr_info("%s :Enter\n", __func__);
-
-    /*
-     * Ven Reset  before sending core Reset
-     * This is to check core reset is allowed or not.
-     * If not allowed then previous FW download is interrupted in between
-     * */
-
-    /*
-     * Core reset  failed.
-     * set the DWNLD_REQ , do ven reset
-     * send firmware download info command
-     * */
-    // pr_err("%s : write failed\n", __func__);
-    pr_info("%s power on with firmware\n", __func__);
-    gpio_set_value(nfc_dev->ven_gpio, 1);
-    msleep(10);
-    if (nfc_dev->firm_gpio) {
-        func(NFC_PLATFORM, _update_state_out)(nfc_dev, ST_DN, true);
-        gpio_set_value(nfc_dev->firm_gpio, 1);
-    }
-    msleep(10);
-    gpio_set_value(nfc_dev->ven_gpio, 0);
-    msleep(10);
-    gpio_set_value(nfc_dev->ven_gpio, 1);
-    msleep(10);
-    ret = i2c_master_send(nfc_dev->client, tmp, get_version_len);
-    if (ret != get_version_len) {
-        pr_err("%s : write_failed ret=%d\n", __func__,ret);
-        kfree(tmp);
-        return ;
-    } else {
-        pr_info("%s :data sent\n", __func__);
-    }
-
-    ret = 0;
-
-    while (retry_count < 10) {
-
-        /*
-         * Wait for read interrupt
-         * If spurious interrupt is received retry again
-         * */
-        nfc_enable_irq(nfc_dev);
-        ret = wait_event_interruptible(
-                  nfc_dev->read_wq,
-                  !nfc_dev->irq_enabled);
-
-        nfc_disable_irq(nfc_dev);
-
-        if (gpio_get_value(nfc_dev->irq_gpio))
-            break;
-
-        pr_warning("%s: spurious interrupt detected\n", __func__);
-        retry_count ++;
-    }
-
-    if(ret) {
-        return;
-    }
-
-    memset(tmp, 0x00, MAX_BUFFER_SIZE);
-    /*
-     * Read response data and copy into hw_type_info
-     * */
-    ret = i2c_master_recv(nfc_dev->client, tmp, 14);
-
-    if(ret > 0) {
-        memcpy(hw_info.data, tmp, ret);
-        hw_info.len = ret;
-        pr_info("%s :Hardware Version  : %d\n", __func__,hw_info.data[3]);
-
-        switch (hw_info.data[3]) {
-        case NFCC_NQ_210:
-            push_component_info(NFC, "NQ210", "NXP");
-            break;
-        case NFCC_NQ_220:
-            push_component_info(NFC, "NQ220", "NXP");
-            break;
-        case NFCC_NQ_310:
-            push_component_info(NFC, "NQ310", "NXP");
-            break;
-        case NFCC_NQ_310_V2:
-            push_component_info(NFC, "NQ310", "NXP");
-            break;
-        case NFCC_NQ_330:
-            push_component_info(NFC, "NQ330", "NXP");
-            break;
-        case NFCC_PN66T:
-            push_component_info(NFC, "PN66T", "NXP");
-            break;
-        default:
-            pr_err("%s: spurious interrupt detected\n", __func__);
-            break;
-        }
-
-    } else {
-        pr_err("%s :Read Failed\n", __func__);
-    }
-    func(NFC_PLATFORM, _update_state_out)(nfc_dev, ST_DN, true);
-    gpio_set_value(nfc_dev->firm_gpio, 0);
-    msleep(10);
-    gpio_set_value(nfc_dev->ven_gpio, 0);
-    udelay(1000);
-    kfree(tmp);
-}
-#endif
 
 static int __init nfc_dev_init(void)
 {
