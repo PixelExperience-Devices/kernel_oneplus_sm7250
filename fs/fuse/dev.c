@@ -40,7 +40,7 @@ static struct fuse_dev *fuse_get_dev(struct file *file)
 
 #ifdef CONFIG_ONEPLUS_FG_OPT
 #include <linux/cred.h>
-extern unsigned int ht_fuse_boost;
+extern unsigned int ht_fuse_boost = 0;
 
 static int fuse_debug;
 module_param_named(fuse_debug, fuse_debug, int, 0664);

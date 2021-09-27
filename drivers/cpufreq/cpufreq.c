@@ -573,7 +573,7 @@ unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 //2020/03/27, add for pccore CONFIG_PCCORE
 		idx = cpufreq_frequency_table_target(policy, target_freq,
 		(get_op_select_freq_enable() &&
-				(ht_pcc_alwayson() || !ccdm_any_hint())) ? CPUFREQ_RELATION_OP : CPUFREQ_RELATION_L);
+				(ht_pcc_alwayson() || !0)) ? CPUFREQ_RELATION_OP : CPUFREQ_RELATION_L);
 		policy->cached_resolved_idx = idx;
 //2020/03/27, add for pccore CONFIG_PCCORE
 		trace_cpu_frequency_select(target_freq, policy->freq_table[idx].frequency, idx, policy->cpu, 1);
