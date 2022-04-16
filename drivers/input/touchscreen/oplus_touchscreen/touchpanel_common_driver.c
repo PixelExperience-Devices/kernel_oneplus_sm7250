@@ -614,7 +614,8 @@ static void tp_gesture_handle(struct touchpanel_data *ts)
 
 	if (gesture_info_temp.gesture_type != UnkownGesture
 			&& gesture_info_temp.gesture_type != FingerprintDown
-			&& gesture_info_temp.gesture_type != FingerprintUp) {
+			&& gesture_info_temp.gesture_type != FingerprintUp
+			&& CHK_BIT(ts->gesture_enable_indep, (1 << gesture_info_temp.gesture_type))) {
 		memcpy(&ts->gesture, &gesture_info_temp, sizeof(struct gesture_info));
 #if GESTURE_RATE_MODE
 
@@ -1944,8 +1945,9 @@ static ssize_t proc_gesture_control_indep_write(struct file *file,
 
 	mutex_lock(&ts->mutex);
 
+	ts->gesture_enable_indep = value;
+
 	if (ts->ts_ops->set_gesture_state) {
-		ts->gesture_enable_indep = value;
 		ts->ts_ops->set_gesture_state(ts->chip_data, value);
 	}
 
@@ -7401,8 +7403,7 @@ static int init_parse_dts(struct device *dev, struct touchpanel_data *ts)
 	ts->headset_pump_support    = of_property_read_bool(np, "headset_pump_support");
 	ts->black_gesture_support   = of_property_read_bool(np,
 				      "black_gesture_support");
-	ts->black_gesture_indep_support   = of_property_read_bool(np,
-					    "black_gesture_indep_support");
+	ts->black_gesture_indep_support   = true;
 	ts->single_tap_support      = of_property_read_bool(np, "single_tap_support");
 	ts->gesture_test_support    = of_property_read_bool(np,
 				      "black_gesture_test_support");
