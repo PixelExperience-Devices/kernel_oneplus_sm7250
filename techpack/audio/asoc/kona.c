@@ -41,7 +41,7 @@
 #include "kona-port-config.h"
 
 #ifdef CONFIG_SND_SOC_SIA81XX
-#include "../../../../oplus/kernel_4.19/audio/codecs/sia81xx/sia81xx_aux_dev_if.h"
+#include "codecs/sia81xx/sia81xx_aux_dev_if.h"
 #endif /* OPLUS_SND_SOC_SIA81XX */
 
 #ifdef OPLUS_BUG_COMPATIBILITY
