@@ -1183,7 +1183,7 @@
 
 		pm8008_interrupt: pm8008_interrupt {
 			mux {
-				pins = "gpio25";
+				pins = "gpior25";
 				function = "gpio";
 			};
 

@@ -72,7 +72,8 @@
 		qcom,gpu-qdss-stm = <0x161c0000 0x40000>; /* base addr, size */
 
 		#cooling-cells = <2>;
-		qcom,tzone-names = "gpuss-0-usr", "gpuss-1-usr";
+
+		qcom,tzone-name = "gpuss-max-step";
 
 		qcom,pm-qos-active-latency = <44>;
 
