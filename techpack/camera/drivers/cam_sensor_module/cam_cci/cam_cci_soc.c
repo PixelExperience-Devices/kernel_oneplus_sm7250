@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  */
 
 #include "cam_cci_dev.h"
@@ -17,8 +17,13 @@ static int cam_cci_init_master(struct cci_device *cci_dev,
 	soc_info = &cci_dev->soc_info;
 	base = soc_info->reg_map[0].mem_base;
 
-	max_queue_0_size = CCI_I2C_QUEUE_0_SIZE;
-	max_queue_1_size = CCI_I2C_QUEUE_1_SIZE;
+	if (cci_dev->hw_version != CCI_VERSION_1_2_9) {
+		max_queue_0_size = CCI_I2C_QUEUE_0_SIZE_V_1_2;
+		max_queue_1_size = CCI_I2C_QUEUE_1_SIZE_V_1_2;
+	} else {
+		max_queue_0_size = CCI_I2C_QUEUE_0_SIZE;
+		max_queue_1_size = CCI_I2C_QUEUE_1_SIZE;
+	}
 
 	cci_dev->master_active_slave[master]++;
 	if (!cci_dev->cci_master_info[master].is_initilized) {
@@ -32,27 +37,26 @@ static int cam_cci_init_master(struct cci_device *cci_dev,
 			reinit_completion(
 			&cci_dev->cci_master_info[master].report_q[i]);
 
-		/* Set reset pending flag to true */
-		cci_dev->cci_master_info[master].reset_pending = true;
-		cci_dev->cci_master_info[master].status = 0;
 		if (cci_dev->ref_count == 1) {
-			cam_io_w_mb(CCI_RESET_CMD_RMSK,
-				base + CCI_RESET_CMD_ADDR);
+			cam_io_w_mb(CCI_RESET_CMD_RMSK, base +
+					CCI_RESET_CMD_ADDR);
 			cam_io_w_mb(0x1, base + CCI_RESET_CMD_ADDR);
 		} else {
+			/* Set reset pending flag to true */
+			cci_dev->cci_master_info[master].reset_pending = true;
 			cam_io_w_mb((master == MASTER_0) ?
 				CCI_M0_RESET_RMSK : CCI_M1_RESET_RMSK,
 				base + CCI_RESET_CMD_ADDR);
-		}
-		if (!wait_for_completion_timeout(
-			&cci_dev->cci_master_info[master].reset_complete,
-			CCI_TIMEOUT)) {
-			CAM_ERR(CAM_CCI,
-				"Failed: reset complete timeout for master: %d",
-				master);
-			rc = -ETIMEDOUT;
-			cci_dev->master_active_slave[master]--;
-			return rc;
+			if (!wait_for_completion_timeout(
+				&cci_dev->cci_master_info[master].reset_complete,
+				CCI_TIMEOUT)) {
+				CAM_ERR(CAM_CCI,
+					"Failed: reset complete timeout for master: %d",
+					master);
+				rc = -ETIMEDOUT;
+				cci_dev->master_active_slave[master]--;
+				return rc;
+			}
 		}
 
 		flush_workqueue(cci_dev->write_wq[master]);
@@ -76,6 +80,7 @@ static int cam_cci_init_master(struct cci_device *cci_dev,
 	return 0;
 }
 
+
 int cam_cci_init(struct v4l2_subdev *sd,
 	struct cam_cci_ctrl *c_ctrl)
 {
@@ -90,8 +95,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	cci_dev = v4l2_get_subdevdata(sd);
 	if (!cci_dev || !c_ctrl) {
-		CAM_ERR(CAM_CCI,
-			"failed: invalid params cci_dev:%pK, c_ctrl:%pK",
+		CAM_ERR(CAM_CCI, "failed: invalid params %pK %pK",
 			cci_dev, c_ctrl);
 		rc = -EINVAL;
 		return rc;
@@ -101,13 +105,13 @@ int cam_cci_init(struct v4l2_subdev *sd,
 	base = soc_info->reg_map[0].mem_base;
 
 	if (!soc_info || !base) {
-		CAM_ERR(CAM_CCI,
-			"failed: invalid params soc_info:%pK, base:%pK",
+		CAM_ERR(CAM_CCI, "failed: invalid params %pK %pK",
 			soc_info, base);
 		rc = -EINVAL;
 		return rc;
 	}
 
+	CAM_DBG(CAM_CCI, "Base address %pK", base);
 	if (master >= MASTER_MAX || master < 0) {
 		CAM_ERR(CAM_CCI, "Incorrect Master: %d", master);
 		return -EINVAL;
@@ -152,8 +156,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 	rc = cam_soc_util_enable_platform_resource(soc_info, true,
 		CAM_LOWSVS_VOTE, true);
 	if (rc < 0) {
-		CAM_DBG(CAM_CCI, "request platform resources failed, rc: %d",
-			rc);
+		CAM_DBG(CAM_CCI, "request platform resources failed");
 		goto platform_enable_failed;
 	}
 
@@ -162,6 +165,9 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	cci_dev->payload_size = MSM_CCI_WRITE_DATA_PAYLOAD_SIZE_11;
 	cci_dev->support_seq_write = 1;
+
+	cam_io_w_mb(CCI_RESET_CMD_RMSK, base + CCI_RESET_CMD_ADDR);
+	cam_io_w_mb(0x1, base + CCI_RESET_CMD_ADDR);
 
 	rc = cam_cci_init_master(cci_dev, master);
 	if (rc) {
@@ -172,7 +178,6 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	for (i = 0; i < MASTER_MAX; i++)
 		cci_dev->i2c_freq_mode[i] = I2C_MAX_MODES;
-
 	cam_io_w_mb(CCI_IRQ_MASK_0_RMSK, base + CCI_IRQ_MASK_0_ADDR);
 	cam_io_w_mb(CCI_IRQ_MASK_0_RMSK, base + CCI_IRQ_CLEAR_0_ADDR);
 	cam_io_w_mb(CCI_IRQ_MASK_1_RMSK, base + CCI_IRQ_MASK_1_ADDR);
@@ -181,9 +186,9 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	/* Set RD FIFO threshold for M0 & M1 */
 	cam_io_w_mb(CCI_I2C_RD_THRESHOLD_VALUE,
-			base + CCI_I2C_M0_RD_THRESHOLD_ADDR);
+		base + CCI_I2C_M0_RD_THRESHOLD_ADDR);
 	cam_io_w_mb(CCI_I2C_RD_THRESHOLD_VALUE,
-			base + CCI_I2C_M1_RD_THRESHOLD_ADDR);
+		base + CCI_I2C_M1_RD_THRESHOLD_ADDR);
 
 	cci_dev->cci_state = CCI_STATE_ENABLED;
 
@@ -191,6 +196,7 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 reset_complete_failed:
 	cam_soc_util_disable_platform_resource(soc_info, 1, 1);
+
 platform_enable_failed:
 	cci_dev->ref_count--;
 	cam_cpas_stop(cci_dev->cpas_handle);
@@ -212,11 +218,11 @@ static void cam_cci_init_cci_params(struct cci_device *new_cci_dev)
 
 	for (i = 0; i < MASTER_MAX; i++) {
 		new_cci_dev->cci_master_info[i].status = 0;
+		new_cci_dev->cci_master_info[i].is_first_req = true;
 		new_cci_dev->cci_master_info[i].is_initilized = false;
-		new_cci_dev->cci_master_info[i].freq_ref_cnt = 0;
 		mutex_init(&new_cci_dev->cci_master_info[i].mutex);
 		sema_init(&new_cci_dev->cci_master_info[i].master_sem, 1);
-		spin_lock_init(&new_cci_dev->cci_master_info[i].freq_cnt_lock);
+		spin_lock_init(&new_cci_dev->cci_master_info[i].freq_cnt);
 		init_completion(
 			&new_cci_dev->cci_master_info[i].reset_complete);
 		init_completion(
@@ -418,13 +424,11 @@ int cam_cci_soc_release(struct cci_device *cci_dev,
 			cci_dev->ref_count);
 		return 0;
 	}
-
 	for (i = 0; i < MASTER_MAX; i++) {
 		if (cci_dev->write_wq[i])
 			flush_workqueue(cci_dev->write_wq[i]);
 		cci_dev->i2c_freq_mode[i] = I2C_MAX_MODES;
 	}
-
 	rc = cam_soc_util_disable_platform_resource(soc_info, true, true);
 	if (rc) {
 		CAM_ERR(CAM_CCI, "platform resources disable failed, rc=%d",

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _CAM_CCI_DEV_H_
@@ -58,6 +58,10 @@
 #define CCI_I2C_MAX_READ 8192
 #define CCI_I2C_MAX_WRITE 8192
 #define CCI_I2C_MAX_BYTE_COUNT 65535
+
+#define CCI_VERSION_1_2_9 0x10020009
+#define CCI_I2C_QUEUE_0_SIZE_V_1_2 64
+#define CCI_I2C_QUEUE_1_SIZE_V_1_2 16
 
 #define CAMX_CCI_DEV_NAME "cam-cci-driver"
 
@@ -121,7 +125,7 @@ struct cam_cci_i2c_queue_info {
 };
 
 struct cam_cci_master_info {
-	int32_t status;
+	uint32_t status;
 	atomic_t q_free[NUM_QUEUES];
 	uint8_t q_lock[NUM_QUEUES];
 	uint8_t reset_pending;
@@ -133,8 +137,9 @@ struct cam_cci_master_info {
 	struct completion report_q[NUM_QUEUES];
 	atomic_t done_pending[NUM_QUEUES];
 	spinlock_t lock_q[NUM_QUEUES];
+	spinlock_t freq_cnt;
 	struct semaphore master_sem;
-	spinlock_t freq_cnt_lock;
+	bool is_first_req;
 	uint16_t freq_ref_cnt;
 	bool is_initilized;
 };

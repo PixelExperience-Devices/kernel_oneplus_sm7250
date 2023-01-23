@@ -4,4 +4,5 @@
  */
 
 #define CONFIG_SPECTRA_CAMERA 1
+#define DOWNLOAD_OIS_FW_BEFORE 1
 
