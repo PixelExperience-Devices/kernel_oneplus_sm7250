@@ -2914,6 +2914,15 @@ int dp_addba_requestprocess_wifi3(struct cdp_soc_t *cdp_soc,
 		goto fail;
 	}
 
+	if (peer->vdev &&
+		peer->vdev->pdev &&
+		wlan_cfg_get_dp_force_rx_64_ba(
+			peer->vdev->pdev->soc->wlan_cfg_ctx)) {
+
+		    QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			    "force use BA64 scheme");
+                   buffersize = 64;
+        }
 	if (wlan_cfg_is_dp_force_rx_64_ba(soc->wlan_cfg_ctx)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 			  "force use BA64 scheme");

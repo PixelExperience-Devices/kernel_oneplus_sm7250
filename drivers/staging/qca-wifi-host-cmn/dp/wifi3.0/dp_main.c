@@ -10561,6 +10561,8 @@ void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
 	}
 }
 
+#define DP_FLUSH_WAIT_CNT 10
+#define DP_RUNTIME_SUSPEND_WAIT_MS 10
 /**
  * dp_runtime_suspend() - ensure DP is ready to runtime suspend
  * @soc_hdl: Datapath soc handle

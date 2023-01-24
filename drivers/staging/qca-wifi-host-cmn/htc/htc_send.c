@@ -882,12 +882,6 @@ static QDF_STATUS htc_issue_packets(HTC_TARGET *target,
 		if (status != QDF_STATUS_SUCCESS) {
 			if (rt_put_in_resp)
 				htc_dec_return_runtime_cnt((void *)target);
-
-			if (pPacket->PktInfo.AsTx.Tag ==
-			    HTC_TX_PACKET_SYSTEM_SUSPEND)
-				__hif_system_pm_set_state(target->hif_dev,
-							  sys_state);
-
 			if (pEndpoint->EpCallBacks.ep_padding_credit_update) {
 				if (used_extra_tx_credit) {
 					ctx = pEndpoint->EpCallBacks.pContext;
