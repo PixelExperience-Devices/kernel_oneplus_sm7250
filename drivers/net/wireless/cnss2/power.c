@@ -802,6 +802,13 @@ static int cnss_select_pinctrl_enable(struct cnss_plat_data *plat_priv)
 
 	if (bt_en_gpio < 0)
 		goto set_wlan_en;
+	switch (plat_priv->device_id) {
+	case QCA6390_DEVICE_ID:
+	case QCA6490_DEVICE_ID:
+		break;
+	default:
+		goto set_wlan_en;
+	}
 
 	switch (plat_priv->device_id) {
 	case QCA6390_DEVICE_ID:

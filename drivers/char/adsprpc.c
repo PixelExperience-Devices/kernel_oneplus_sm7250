@@ -1006,6 +1006,7 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd,
 	map->refs = 1;
 	map->fl = fl;
 	map->fd = fd;
+	map->is_filemap = false;
 	map->attr = attr;
 	map->is_filemap = false;
 	if (mflags == ADSP_MMAP_HEAP_ADDR ||
@@ -2642,6 +2643,9 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 			if (file)
 				file->is_filemap = true;
 			mutex_unlock(&fl->map_mutex);
+			if (file) {
+				file->is_filemap = true;
+			}
 			if (err)
 				goto bail;
 		}
@@ -2650,7 +2654,7 @@ static int fastrpc_init_process(struct fastrpc_file *fl,
 		VERIFY(err, !init->mem);
 		if (err) {
 			err = -EINVAL;
-			pr_err("adsprpc: %s: %s: ERROR: donated memory allocated in userspace\n",
+			pr_err("adsprpc: %s: %s: ERROR: donated memory allocated in userspace \n",
 				current->comm, __func__);
 			goto bail;
 		}
@@ -3853,6 +3857,7 @@ static int fastrpc_file_free(struct fastrpc_file *fl)
 	mutex_destroy(&fl->map_mutex);
 	mutex_destroy(&fl->pm_qos_mutex);
 	mutex_destroy(&fl->internal_map_mutex);
+	mutex_destroy(&fl->pm_qos_mutex);
 	kfree(fl);
 	return 0;
 }

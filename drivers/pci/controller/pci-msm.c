@@ -4419,6 +4419,8 @@ static int msm_pcie_link_train(struct msm_pcie_dev_t *dev)
 		val =  readl_relaxed(dev->elbi + PCIE20_ELBI_SYS_STTS);
 		PCIE_DBG(dev, "PCIe RC%d: LTSSM_STATE: %s\n",
 			dev->rc_idx, TO_LTSSM_STR((val >> 12) & 0x3f));
+		if ((link_check_count % 10) == 0)
+			pr_err("PCIe RC%d: LTSSM_STATE: %s\n",dev->rc_idx, TO_LTSSM_STR((val >> 12) & 0x3f));
 	} while ((!(val & XMLH_LINK_UP) ||
 		!msm_pcie_confirm_linkup(dev, false, false, NULL))
 		&& (link_check_count++ < dev->link_check_max_count));

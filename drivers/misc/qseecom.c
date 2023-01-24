@@ -5367,8 +5367,10 @@ int qseecom_process_listener_from_smcinvoke(struct scm_desc *desc)
 		pr_err("Failed on cmd %d for lsnr %d session %d, ret = %d\n",
 			(int)desc->ret[0], (int)desc->ret[2],
 			(int)desc->ret[1], ret);
+//#ifdef OPLUS_BUG_COMPATIBILITY
 	desc->ret[0] = resp.result;
 	desc->ret[1] = resp.resp_type;
+//#endif /* OPLUS_BUG_COMPATIBILITY */
 	desc->ret[2] = resp.data;
 	return ret;
 }
