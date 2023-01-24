@@ -9155,7 +9155,7 @@ bool oplus_chg_check_qchv_condition(void)
 	return false;
 }
 
-int oplus_chg_set_qc_config()
+int oplus_chg_set_qc_config(void)
 {
 	int ret = -1;
 	struct smb_charger *chg = NULL;
@@ -10460,7 +10460,7 @@ void oplus_get_usbtemp_volt(struct oplus_chg_chip *chip)
 	return ;
 }
 
-void oplus_set_typec_sinkonly()
+void oplus_set_typec_sinkonly(void)
 {
 	int rc;
 	struct smb_charger *chg = NULL;
