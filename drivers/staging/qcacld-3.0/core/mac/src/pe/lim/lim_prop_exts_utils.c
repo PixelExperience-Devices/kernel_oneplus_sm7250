@@ -375,6 +375,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	tDot11fIEVHTCaps *vht_caps;
 	uint8_t channel = 0;
 	struct mlme_vht_capabilities_info *mlme_vht_cap;
+	bool ch_wd_initialized = false;
 
 	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (!beacon_struct)
@@ -469,8 +470,14 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 					WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 		}
 
-		fw_vht_ch_wd = wma_get_vht_ch_width();
-		vht_ch_wd = QDF_MIN(fw_vht_ch_wd, ap_bcon_ch_width);
+		if (session->opmode == QDF_P2P_CLIENT_MODE &&
+		    !wlan_reg_is_24ghz_ch_freq(beacon_struct->chan_freq)) {
+			vht_ch_wd = wma_get_vht_ch_width();
+			pe_debug("vht_ch_wd: %u", vht_ch_wd);
+		} else {
+			fw_vht_ch_wd = wma_get_vht_ch_width();
+			vht_ch_wd = QDF_MIN(fw_vht_ch_wd, ap_bcon_ch_width);
+		}
 
 		if ((vht_ch_wd > WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) &&
 		    (ap_bcon_ch_width ==
@@ -545,6 +552,15 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 				lim_get_80Mhz_center_channel(channel);
 		}
 		session->ch_width = vht_ch_wd + 1;
+		ch_wd_initialized = true;
+	}
+
+	if (!ch_wd_initialized &&
+	    (session->opmode == QDF_P2P_CLIENT_MODE &&
+	     !wlan_reg_is_24ghz_ch_freq(beacon_struct->chan_freq))) {
+		lim_get_cb_mode_for_p2p_client(mac_ctx, session,
+					       beacon_struct->chan_freq);
+		pe_debug("session->ch_width: %u", session->ch_width);
 	}
 
 	if (session->vhtCapability &&
