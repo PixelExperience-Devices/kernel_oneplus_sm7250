@@ -1298,23 +1298,24 @@
 /* Add for NXP NFCC */
 &qupv3_se0_i2c {
         status = "ok";
-        //qcom,clk-freq-out = <1000000>;
+        qcom,clk-freq-out = <1000000>;
+        #address-cells = <1>;
+        #size-cells = <0>;
     nq@28 {
-        compatible = "nxp,pn544";
+        compatible = "qcom,nq-nci";
         reg = <0x28>;
-        nxp,pn544-irq = <&tlmm 34 0x00>;
-        nxp,pn544-ven = <&tlmm 12 0x00>;
-        nxp,pn544-fw-dwnld = <&tlmm 35 0x00>;
-        nxp,pn544-clk-gpio = <&tlmm 31 0x00>;
-        nxp,pn544-ese-pwr = <&tlmm 26 0x00>;
-        //nfc_voltage_s4-supply = <&pm8150_s4>;
+        qcom,nq-irq = <&tlmm 34 0x00>;
+        qcom,nq-ven = <&tlmm 12 0x00>;
+        qcom,nq-firm = <&tlmm 35 0x00>;
+        qcom,nq-clkreq = <&tlmm 31 0x00>;
         interrupt-parent = <&tlmm>;
-        //qcom,clk-src = "BBCLK3";
         interrupts = <34 0>;
         interrupt-names = "nfc_irq";
         pinctrl-names = "nfc_active", "nfc_suspend";
-        pinctrl-0 = <&nfc_int_active &nfc_enable_active>;
-        pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
+        pinctrl-0 = <&nfc_int_active &nfc_enable_active
+                        &nfc_clk_req_active>;
+        pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend
+                        &nfc_clk_req_suspend>;
     };
 };
 
