@@ -2469,6 +2469,20 @@ static int goodix_get_gesture_info(void *chip_data, struct gesture_info *gesture
         gesture->Point_3rd.y = (point_data[14] & 0xFF) | (point_data[15] & 0x0F) << 8;
         break;
 
+    case S_DETECT :
+        gesture->gesture_type = Sgestrue;
+        gesture->clockwise = clockWise(&point_data[0], point_num);
+        getSpecialCornerPoint(&point_data[0], point_num, &limitPoint[0]);
+        gesture->Point_start.x = (point_data[0] & 0xFF) | (point_data[1] & 0x0F) << 8;
+        gesture->Point_start.y = (point_data[2] & 0xFF) | (point_data[3] & 0x0F) << 8;
+        gesture->Point_end.x   = (point_data[20] & 0xFF) | (point_data[21] & 0x0F) << 8;
+        gesture->Point_end.y   = (point_data[22] & 0xFF) | (point_data[23] & 0x0F) << 8;
+        gesture->Point_1st = limitPoint[0]; //ymin
+        gesture->Point_2nd = limitPoint[1]; //xmin
+        gesture->Point_3rd = limitPoint[2]; //ymax
+        gesture->Point_4th = limitPoint[3]; //xmax
+        break;
+
     default:
         gesture->gesture_type = UnkownGesture;
         break;

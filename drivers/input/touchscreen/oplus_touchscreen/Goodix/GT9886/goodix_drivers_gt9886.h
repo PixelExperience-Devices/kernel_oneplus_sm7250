@@ -134,6 +134,7 @@
 #define UP_SLIDE_DETECT                 0xBA
 #define M_DETECT                        0x6D
 #define W_DETECT                        0x77
+#define S_DETECT                        0x73
 #define FP_DOWN_DETECT                  0x46
 #define FP_UP_DETECT                    0x55
 

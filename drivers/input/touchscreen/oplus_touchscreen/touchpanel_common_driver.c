@@ -587,6 +587,7 @@ static void tp_gesture_handle(struct touchpanel_data *ts)
 		 gesture_info_temp.gesture_type == Down2UpSwip ? "down to up |" :
 		 gesture_info_temp.gesture_type == Mgestrue ? "(M)" :
 		 gesture_info_temp.gesture_type == Wgestrue ? "(W)" :
+		 gesture_info_temp.gesture_type == Sgestrue ? "(S)" :
 		 gesture_info_temp.gesture_type == FingerprintDown ? "(fingerprintdown)" :
 		 gesture_info_temp.gesture_type == FingerprintUp ? "(fingerprintup)" :
 		 gesture_info_temp.gesture_type == SingleTap ? "single tap" :
