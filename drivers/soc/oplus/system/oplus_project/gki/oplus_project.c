@@ -432,7 +432,7 @@ static void dump_secure_stage(struct seq_file *s)
     seq_printf(s, "%d", secure_oem_config);
 }
 
-static void __initdata update_manifest(struct proc_dir_entry *parent_1, struct proc_dir_entry *parent_2)
+static void __init update_manifest(struct proc_dir_entry *parent_1, struct proc_dir_entry *parent_2)
 {
     static const char* manifest_src[2] = {
         "/vendor/odm/etc/vintf/manifest_ssss.xml",
@@ -464,7 +464,7 @@ static void __initdata update_manifest(struct proc_dir_entry *parent_1, struct p
     set_fs(fs);
 }
 
-static void __initdata update_telephony_manifest(struct proc_dir_entry *parent_1, struct proc_dir_entry *parent_2)
+static void __init update_telephony_manifest(struct proc_dir_entry *parent_1, struct proc_dir_entry *parent_2)
 {
     static const char* manifest_src[2] = {
         "/vendor/odm/etc/vintf/telephony_manifest_ssss.xml",
