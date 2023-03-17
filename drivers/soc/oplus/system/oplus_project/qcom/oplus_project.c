@@ -436,7 +436,7 @@ static void dump_secure_stage(struct seq_file *s)
 }
 
 //#ifdef OPLUS_FEATURE_NFC_FELICA
-static void __initdata update_felica_cfg(struct proc_dir_entry *parent) {
+static void __init update_felica_cfg(struct proc_dir_entry *parent) {
 
     static const char* simfree_cfg_src[3] = {
         "/odm/etc/felica_cfg/simfree/common.cfg",
