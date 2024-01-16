@@ -257,15 +257,14 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 		.for_reclaim = 0,
 	};
 	unsigned int seq_id = 0;
+#ifdef CONFIG_F2FS_BD_STAT
+        u64 fsync_begin = 0, fsync_end = 0, wr_file_end, cp_begin = 0,
+            cp_end = 0, sync_node_begin = 0, sync_node_end = 0,
+            flush_begin = 0, flush_end = 0;
+#endif
 
 	if (unlikely(f2fs_readonly(inode->i_sb)))
 		return 0;
-
-#ifdef CONFIG_F2FS_BD_STAT
-	u64 fsync_begin = 0, fsync_end = 0, wr_file_end, cp_begin = 0,
-	    cp_end = 0, sync_node_begin = 0, sync_node_end = 0,
-	    flush_begin = 0, flush_end = 0;
-#endif
 
 	trace_f2fs_sync_file_enter(inode);
 
@@ -3377,6 +3376,7 @@ int f2fs_precache_extents(struct inode *inode)
 		return -EOPNOTSUPP;
 
 	map.m_lblk = 0;
+	map.m_pblk = 0;
 	map.m_next_pgofs = NULL;
 	map.m_next_extent = &m_next_extent;
 	map.m_seg_type = NO_CHECK_TYPE;

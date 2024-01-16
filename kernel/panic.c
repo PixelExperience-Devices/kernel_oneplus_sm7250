@@ -205,20 +205,20 @@ void panic(const char *fmt, ...)
 	int state = 0;
 	int old_cpu, this_cpu;
 	bool _crash_kexec_post_notifiers = crash_kexec_post_notifiers;
-
-	if (panic_on_warn) {
-		/*
-		 * This thread may hit another WARN() in the panic path.
-		 * Resetting this prevents additional WARN() from panicking the
-		 * system on this thread.  Other threads are blocked by the
-		 * panic_mutex in panic().
-		 */
-		panic_on_warn = 0;
-	}
-
 #ifdef OPLUS_FEATURE_AGINGTEST
 	char *function_name;
 #endif /*OPLUS_FEATURE_AGINGTEST*/
+
+        if (panic_on_warn) {
+                /*
+                 * This thread may hit another WARN() in the panic path.
+                 * Resetting this prevents additional WARN() from panicking the
+                 * system on this thread.  Other threads are blocked by the
+                 * panic_mutex in panic().
+                 */
+                panic_on_warn = 0;
+        }
+
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
 	 * from deadlocking the first cpu that invokes the panic, since
